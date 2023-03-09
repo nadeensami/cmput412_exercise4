@@ -41,9 +41,9 @@ class LaneFollowNode(DTROS):
     # PID Variables
     self.proportional = None
     if ENGLISH:
-      self.offset = -220
+      self.offset = -200
     else:
-      self.offset = 220
+      self.offset = 200
     self.velocity = 0.2
     self.twist = Twist2DStamped(v=self.velocity, omega=0)
 
