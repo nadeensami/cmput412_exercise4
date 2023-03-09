@@ -8,10 +8,11 @@ from std_msgs.msg import Float32
 from turbojpeg import TurboJPEG
 import cv2
 import numpy as np
-from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
+from duckietown_msgs.msg import Twist2DStamped
 
+STOP_MASK = [(0, 150, 235), (16, 185, 255)]
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
-DEBUG = True
+DEBUG = False
 ENGLISH = False
 
 class LaneFollowNode(DTROS):
