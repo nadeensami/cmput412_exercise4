@@ -103,7 +103,7 @@ class LaneFollowNode(DTROS):
       self.proportional = None
     
     # See if we need to look for stop lines
-    if self.last_stop_time and rospy.get_time() - self.last_stop_time < self.stop_cooldown:
+    if self.stop or (self.last_stop_time and rospy.get_time() - self.last_stop_time < self.stop_cooldown):
       if DEBUG:
         rect_img_msg = CompressedImage(format="jpeg", data=self.jpeg.encode(crop))
         self.pub.publish(rect_img_msg)
@@ -147,13 +147,14 @@ class LaneFollowNode(DTROS):
       self.pub.publish(rect_img_msg)
 
   def drive(self):
-    if self.stop and rospy.get_time() - self.stop_starttime < self.stop_duration:
-      self.twist.v = 0
-      self.twist.omega = 0
-      self.vel_pub.publish(self.twist)
-    elif self.stop:
-      self.stop = False
-      self.last_stop_time = rospy.get_time()
+    if self.stop:
+      if rospy.get_time() - self.stop_starttime < self.stop_duration:
+        self.twist.v = 0
+        self.twist.omega = 0
+        self.vel_pub.publish(self.twist)
+      else:
+        self.stop = False
+        self.last_stop_time = rospy.get_time()
     elif self.proportional is None:
       self.twist.omega = 0
       self.vel_pub.publish(self.twist)
