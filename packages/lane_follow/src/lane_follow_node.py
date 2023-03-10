@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import rospy
+import rospy, time
 
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CameraInfo, CompressedImage
@@ -10,9 +10,9 @@ import cv2
 import numpy as np
 from duckietown_msgs.msg import Twist2DStamped
 
-STOP_MASK = [(0, 150, 235), (16, 185, 255)]
+STOP_MASK = [(0, 75, 150), (5, 150, 255)]
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
-DEBUG = False
+DEBUG = True
 ENGLISH = False
 
 class LaneFollowNode(DTROS):
@@ -53,6 +53,14 @@ class LaneFollowNode(DTROS):
     self.last_error = 0
     self.last_time = rospy.get_time()
 
+    # Stop variables
+    self.stop = False
+    self.last_stop_time = None
+    self.stop_cooldown = 5
+    self.stop_duration = 5
+    self.stop_threshold_area = 5000 # minimun area of red to stop at
+    self.stop_starttime = None
+
     # Shutdown hook
     rospy.on_shutdown(self.hook)
 
@@ -61,11 +69,15 @@ class LaneFollowNode(DTROS):
     crop = img[300:-1, :, :]
     crop_width = crop.shape[1]
     hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
-    crop = cv2.bitwise_and(crop, crop, mask=mask)
-    contours, hierarchy = cv2.findContours(mask,
-                         cv2.RETR_EXTERNAL,
-                         cv2.CHAIN_APPROX_NONE)
+
+    # Mask for road lines
+    roadMask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
+    # crop = cv2.bitwise_and(crop, crop, mask=roadMask)
+    contours, _ = cv2.findContours(
+      roadMask,
+      cv2.RETR_EXTERNAL,
+      cv2.CHAIN_APPROX_NONE
+    )
 
     # Search for lane in front
     max_area = 20
@@ -89,14 +101,62 @@ class LaneFollowNode(DTROS):
         pass
     else:
       self.proportional = None
+    
+    # See if we need to look for stop lines
+    if self.last_stop_time and rospy.get_time() - self.last_stop_time < self.stop_cooldown:
+      if DEBUG:
+        rect_img_msg = CompressedImage(format="jpeg", data=self.jpeg.encode(crop))
+        self.pub.publish(rect_img_msg)
+      return
+    
+    # Mask for stop lines
+    stopMask = cv2.inRange(hsv, STOP_MASK[0], STOP_MASK[1])
+    # crop = cv2.bitwise_and(crop, crop, mask=stopMask)
+    stopContours, _ = cv2.findContours(
+      stopMask,
+      cv2.RETR_EXTERNAL,
+      cv2.CHAIN_APPROX_NONE
+    )
+
+    # Search for lane in front
+    max_area = self.stop_threshold_area
+    max_idx = -1
+    for i in range(len(stopContours)):
+      area = cv2.contourArea(stopContours[i])
+      if area > max_area:
+        max_idx = i
+        max_area = area
+
+    if max_idx != -1:
+      M = cv2.moments(stopContours[max_idx])
+      try:
+        cx = int(M['m10'] / M['m00'])
+        cy = int(M['m01'] / M['m00'])
+        self.stop = True
+        self.stop_starttime = rospy.get_time()
+        if DEBUG:
+          cv2.drawContours(crop, stopContours, max_idx, (0, 255, 0), 3)
+          cv2.circle(crop, (cx, cy), 7, (0, 0, 255), -1)
+      except:
+        pass
+    else:
+      self.stop = False
 
     if DEBUG:
       rect_img_msg = CompressedImage(format="jpeg", data=self.jpeg.encode(crop))
       self.pub.publish(rect_img_msg)
 
   def drive(self):
-    if self.proportional is None:
+    if self.stop and rospy.get_time() - self.stop_starttime < self.stop_duration:
+      self.twist.v = 0
       self.twist.omega = 0
+      self.vel_pub.publish(self.twist)
+    elif self.stop:
+      self.stop = False
+      self.last_stop_time = rospy.get_time()
+    elif self.proportional is None:
+      self.twist.omega = 0
+      self.vel_pub.publish(self.twist)
     else:
       # P Term
       P = -self.proportional * self.P
@@ -112,8 +172,7 @@ class LaneFollowNode(DTROS):
       if DEBUG:
         # self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
         print(self.proportional, P, D, self.twist.omega, self.twist.v)
-
-    self.vel_pub.publish(self.twist)
+      self.vel_pub.publish(self.twist)
 
   def hook(self):
     print("SHUTTING DOWN")
