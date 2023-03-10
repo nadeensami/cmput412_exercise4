@@ -8,8 +8,8 @@ from dt_apriltags import Detector
 from turbojpeg import TurboJPEG, TJPF_GRAY
 from image_geometry import PinholeCameraModel
 import cv2
-import numpy as np
-from duckietown_msgs.msg import Twist2DStamped
+from std_msgs.msg import Header, ColorRGBA
+from duckietown_msgs.msg import Twist2DStamped, LEDPattern
 
 STOP_MASK = [(0, 75, 150), (5, 150, 255)]
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
@@ -22,6 +22,8 @@ class LaneFollowNode(DTROS):
     super(LaneFollowNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
     self.node_name = node_name
     self.veh = rospy.get_param("~veh")
+
+    self.is_following_robot = False
 
     # Publishers & Subscribers
     self.pub = rospy.Publisher("/" + self.veh + "/output/image/mask/compressed",
@@ -95,21 +97,21 @@ class LaneFollowNode(DTROS):
       self.camera_model.K, self.camera_model.D, None, rect_K, (W, H), cv2.CV_32FC1
     )
 
-    self.apriltag_map = {
-      '169': 'left', # Stop
-      '162': 'right', # Stop
-      '153': 'left', # T-intersection
-      '133': 'right', # T-intersection
-      '62': 'left', # T-intersection
-      '58': 'right', # T-intersection
-    }
+    self.intersection_apriltags =  [169, 162, 153, 133, 62, 58]
+    self.right_turn_apriltags = [133, 169]
 
-    self.apriltag_intersection = None
+    self.last_detected_apriltag = None
 
     # Timer
     self.publish_hz = 1
     self.timer = rospy.Timer(rospy.Duration(1 / self.publish_hz), self.cb_apriltag_timer)
     self.last_message = None
+
+    # Initialize LED color-changing
+    self.color_publisher = rospy.Publisher(f'/{self.veh}/led_emitter_node/led_pattern', LEDPattern, queue_size = 1)
+    self.pattern = LEDPattern()
+    self.pattern.header = Header()
+    self.signalled = False
 
     # Shutdown hook
     rospy.on_shutdown(self.hook)
@@ -224,8 +226,8 @@ class LaneFollowNode(DTROS):
         continue
 
       # save tag id if we're about to go to an intersection
-      if str(tag.tag_id) in self.apriltag_map:
-        self.apriltag_intersection=tag.tag_id
+      if tag.tag_id in self.intersection_apriltags:
+        self.last_detected_apriltag = tag.tag_id
     
 
   def drive(self):
@@ -234,9 +236,20 @@ class LaneFollowNode(DTROS):
         self.twist.v = 0
         self.twist.omega = 0
         self.vel_pub.publish(self.twist)
+
+        # TODO: sometimes bot doesn't stop before intersection (ie april tag # 169). FIX THIS.
+        # on autonomous lane following
+        if not self.is_following_robot and not self.signalled:
+          # right turn on 133
+          if self.last_detected_apriltag in self.right_turn_apriltags:
+            self.change_color("right")
+            self.signalled = True
+
       else:
         self.stop = False
         self.last_stop_time = rospy.get_time()
+        self.change_color(None)
+        self.signalled = False
     elif self.proportional is None:
       self.twist.omega = 0
       self.vel_pub.publish(self.twist)
@@ -256,6 +269,39 @@ class LaneFollowNode(DTROS):
         # self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
         print(self.proportional, P, D, self.twist.omega, self.twist.v)
       self.vel_pub.publish(self.twist)
+
+  def change_color(self, turn_signal):
+    '''
+    Code for this function was inspired by 
+    "duckietown/dt-core", file "led_emitter_node.py"
+    Link: https://github.com/duckietown/dt-core/blob/daffy/packages/led_emitter/src/led_emitter_node.py
+    Author: GitHub user liampaull
+    '''
+
+    self.pattern.header.stamp = rospy.Time.now()
+    rgba_yellow = ColorRGBA()
+    rgba_none = ColorRGBA()
+
+    rgba_yellow.r = 1.0
+    rgba_yellow.g = 1.0
+    rgba_yellow.b = 0.0
+    rgba_yellow.a = 0.0
+
+    rgba_none.r = 0.0
+    rgba_none.g = 0.0
+    rgba_none.b = 0.0
+    rgba_none.a = 0.0
+
+    # default: turn off
+    self.pattern.rgb_vals = [rgba_none] * 5
+
+    if turn_signal == "right":
+      self.pattern.rgb_vals = [rgba_none, rgba_none, rgba_yellow, rgba_yellow, rgba_none]
+    elif  turn_signal == "left":
+      # TODO: CHECK IF THIS ARRAY IS CORRECT
+      self.pattern.rgb_vals = [rgba_yellow, rgba_none, rgba_none, rgba_none, rgba_yellow]
+      
+    self.color_publisher.publish(self.pattern)
 
   def hook(self):
     print("SHUTTING DOWN")
