@@ -84,17 +84,13 @@ class LaneFollowNode(DTROS):
 
     # Left turn variables
     self.left_turn_duration = 1.5
+    self.right_turn_duration = 1
+    self.straight_duration = 1
     self.started_action = None
     
-    # Duckiebot-following PID Variables
-    # self.distance_proportional = None
+    # Duckiebot-following variables
     self.following_distance = 0.2
     self.next_action = None
-
-    # self.P = 0.0001
-    # self.D = -0.004
-    # self.last_distance_error = 0
-    # self.last_distance_time = rospy.get_time()
 
     # Stop variables
     self.stop = False
@@ -304,49 +300,66 @@ class LaneFollowNode(DTROS):
         self.twist.omega = 0
         self.vel_pub.publish(self.twist)
         
-        # Get available action from last detected april tag
-        if self.last_detected_apriltag and self.last_detected_apriltag in self.apriltag_actions:
-          avail_actions = self.apriltag_actions[self.last_detected_apriltag]
-        else:
-          avail_actions = [None]
+        # Determine next action, if we haven't already
+        if not self.next_action:
+          # Get available action from last detected april tag
+          if self.last_detected_apriltag and self.last_detected_apriltag in self.apriltag_actions:
+            avail_actions = self.apriltag_actions[self.last_detected_apriltag]
+          else:
+            avail_actions = [None]
 
-        # If we detect a duckiebot and that turn is valid
-        if self.rotation_of_robot and self.rotation_of_robot in avail_actions:
-          self.next_action = self.rotation_of_robot
-        elif "left" in avail_actions:
-          self.next_action = "left"
-        else:
-          self.next_action = random.choice(avail_actions)
+          # If we detect a duckiebot and that turn is valid
+          if self.rotation_of_robot and self.rotation_of_robot in avail_actions:
+            self.next_action = self.rotation_of_robot
+          elif "right" in avail_actions:
+            self.next_action = "right"
+          else:
+            self.next_action = random.choice(avail_actions)
+          
+          self.change_color(self.next_action)
+        
       else:
         # Do next action
         if self.next_action == "left":
           # Go left
-          self.change_color("left")
           if self.started_action == None:
             self.started_action = rospy.get_time()
           elif rospy.get_time() - self.started_action < self.left_turn_duration:
-            print("turning! ")
             self.twist.v = self.velocity
-            self.twist.omega = -1.0
+            self.twist.omega = 2.5
             self.vel_pub.publish(self.twist)
           else:
             self.started_action = None
             self.next_action = None
         elif self.next_action == "right":
           # Go right
-          self.change_color("right")
-          # TODO: add twist command
-          self.next_action = None
-
+          if self.started_action == None:
+            self.started_action = rospy.get_time()
+          elif rospy.get_time() - self.started_action < self.right_turn_duration:
+            self.twist.v = self.velocity
+            self.twist.omega = -2.5
+            self.vel_pub.publish(self.twist)
+          else:
+            self.started_action = None
+            self.next_action = None
         elif self.next_action == "straight":
           # Go straight
-          self.next_action = None
+          if self.started_action == None:
+            self.started_action = rospy.get_time()
+          elif rospy.get_time() - self.started_action < self.straight_duration:
+            self.twist.v = self.velocity
+            self.twist.omega = 0
+            self.vel_pub.publish(self.twist)
+          else:
+            self.started_action = None
+            self.next_action = None
         else:
           self.stop = False
           self.last_stop_time = rospy.get_time()
           self.change_color(None)
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
+      print(self.distance_from_robot)
       if not self.distance_from_robot or self.distance_from_robot > self.following_distance:
         self.twist.v = self.velocity
       else:
