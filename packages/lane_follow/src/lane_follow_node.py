@@ -83,9 +83,9 @@ class LaneFollowNode(DTROS):
     self.last_time = rospy.get_time()
 
     # Left turn variables
-    self.left_turn_duration = 5
-    self.started_left_turn = None
-
+    self.left_turn_duration = 1.5
+    self.started_action = None
+    
     # Duckiebot-following PID Variables
     # self.distance_proportional = None
     self.following_distance = 0.2
@@ -303,7 +303,7 @@ class LaneFollowNode(DTROS):
         self.twist.v = 0
         self.twist.omega = 0
         self.vel_pub.publish(self.twist)
-
+        
         # Get available action from last detected april tag
         if self.last_detected_apriltag and self.last_detected_apriltag in self.apriltag_actions:
           avail_actions = self.apriltag_actions[self.last_detected_apriltag]
@@ -322,15 +322,15 @@ class LaneFollowNode(DTROS):
         if self.next_action == "left":
           # Go left
           self.change_color("left")
-          if self.started_left_turn == None:
-            self.started_left_turn = rospy.get_time()
-          elif rospy.get_time() - self.started_left_turn < self.left_turn_duration:
+          if self.started_action == None:
+            self.started_action = rospy.get_time()
+          elif rospy.get_time() - self.started_action < self.left_turn_duration:
             print("turning! ")
             self.twist.v = self.velocity
             self.twist.omega = -1.0
             self.vel_pub.publish(self.twist)
           else:
-            self.started_left_turn = None
+            self.started_action = None
             self.next_action = None
         elif self.next_action == "right":
           # Go right
