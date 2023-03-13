@@ -297,7 +297,6 @@ class LaneFollowNode(DTROS):
     if turn_signal == "right":
       self.pattern.rgb_vals = [rgba_none, rgba_none, rgba_yellow, rgba_yellow, rgba_none]
     elif  turn_signal == "left":
-      # TODO: CHECK IF THIS ARRAY IS CORRECT
       self.pattern.rgb_vals = [rgba_yellow, rgba_none, rgba_none, rgba_none, rgba_yellow]
       
     self.color_publisher.publish(self.pattern)
