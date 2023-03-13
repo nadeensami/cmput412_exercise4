@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import rospy
+import rospy, random
 
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CameraInfo, CompressedImage
@@ -17,7 +17,6 @@ DEBUG = False
 ENGLISH = False
 
 class LaneFollowNode(DTROS):
-
   def __init__(self, node_name):
     super(LaneFollowNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
     self.node_name = node_name
@@ -25,21 +24,21 @@ class LaneFollowNode(DTROS):
 
     # Subscribers
     self.sub = rospy.Subscriber(
-      "/" + self.veh + "/camera_node/image/compressed",
+      f"/{self.veh}/camera_node/image/compressed",
       CompressedImage,
       self.callback,
       queue_size=1,
       buff_size="20MB"
     )
     self.distance_sub = rospy.Subscriber(
-      "/" + self.veh + "/duckiebot_distance_node/distance",
+      f"/{self.veh}/duckiebot_distance_node/distance",
       Float32,
       self.cb_distance,
       queue_size=1,
       buff_size="20MB"
     )
     self.rotation_sub = rospy.Subscriber(
-      "/" + self.veh + "/duckiebot_distance_node/rotation",
+      f"/{self.veh}/duckiebot_distance_node/rotation",
       String,
       self.cb_rotation,
       queue_size=1,
@@ -48,16 +47,16 @@ class LaneFollowNode(DTROS):
     
     # Publishers
     self.pub = rospy.Publisher(
-      "/" + self.veh + "/output/image/mask/compressed",
+      f"/{self.veh}/output/image/mask/compressed",
       CompressedImage,
       queue_size=1
     )
     self.vel_pub = rospy.Publisher(
-      "/" + self.veh + "/car_cmd_switch_node/cmd",
+      f"/{self.veh}/car_cmd_switch_node/cmd",
       Twist2DStamped,
       queue_size=1
     )
-    self.color_publisher = rospy.Publisher(f'/{self.veh}/led_emitter_node/led_pattern', LEDPattern, queue_size = 1)
+    self.color_publisher = rospy.Publisher(f"/{self.veh}/led_emitter_node/led_pattern", LEDPattern, queue_size = 1)
     
     # Pose detection variables
     self.stale_time = 5
@@ -69,7 +68,7 @@ class LaneFollowNode(DTROS):
 
     self.jpeg = TurboJPEG()
 
-    # PID Variables
+    # Lane-following PID Variables
     self.proportional = None
     if ENGLISH:
       self.offset = -200
@@ -87,6 +86,16 @@ class LaneFollowNode(DTROS):
     self.left_turn_duration = 1.5
     self.started_left_turn = None
     self.turn_action = None
+    
+    # Duckiebot-following PID Variables
+    # self.distance_proportional = None
+    self.following_distance = 0.2
+    self.next_action = None
+
+    # self.P = 0.0001
+    # self.D = -0.004
+    # self.last_distance_error = 0
+    # self.last_distance_time = rospy.get_time()
 
     # Stop variables
     self.stop = False
@@ -271,6 +280,7 @@ class LaneFollowNode(DTROS):
     
   def cb_distance(self, msg):
     self.distance_from_robot = msg.data
+    # self.distance_proportional = self.distance_from_robot - self.distance_offset
     self.last_distance_detected_time = rospy.get_time()
 
   def cb_rotation(self, msg):
@@ -290,6 +300,7 @@ class LaneFollowNode(DTROS):
   def drive(self):
     if self.stop:
       if rospy.get_time() - self.stop_starttime < self.stop_duration:
+        # Stop
         self.twist.v = 0
         self.twist.omega = 0
         self.vel_pub.publish(self.twist)
@@ -299,17 +310,37 @@ class LaneFollowNode(DTROS):
           self.change_color(self.apriltag_actions[str(self.last_detected_apriltag)][0])
           self.turn_action = self.apriltag_actions[str(self.last_detected_apriltag)][0]
 
+        # Get available action from last detected april tag
+        avail_actions = self.apriltag_actions[self.last_detected_apriltag]
+
+        # If we detect a duckiebot and that turn is valid
+        if self.rotation_of_robot and self.rotation_of_robot in avail_actions:
+          self.next_action = self.rotation_of_robot
+        else:
+          self.next_action = random.choice(avail_actions)
       else:
+        # Do next action
+        if self.next_action == "left":
+          # Go left
+          self.change_color("left")
+          # TODO: add twist command
+        elif self.next_action == "right":
+          # Go right
+          self.change_color("right")
+          # TODO: add twist command
+        else:
+          # Go straight
+          pass
+
         self.stop = False
         self.last_stop_time = rospy.get_time()
         self.change_color(None)
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
-      if self.distance_from_robot is None:
+      if not self.distance_from_robot or self.distance_from_robot > self.following_distance:
         self.twist.v = self.velocity
       else:
-        # Use the PID here
-        pass
+        self.twist.v = 0
 
       if self.turn_action == "left":
         if self.started_left_turn == None:
