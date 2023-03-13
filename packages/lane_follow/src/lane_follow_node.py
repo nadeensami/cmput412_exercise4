@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import rospy, time
+import rospy
 
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CameraInfo, CompressedImage
@@ -8,13 +8,14 @@ from dt_apriltags import Detector
 from turbojpeg import TurboJPEG, TJPF_GRAY
 from image_geometry import PinholeCameraModel
 import cv2
-from std_msgs.msg import Header, ColorRGBA
+from std_msgs.msg import Header, ColorRGBA, Float32
 from duckietown_msgs.msg import Twist2DStamped, LEDPattern
 
 STOP_MASK = [(0, 75, 150), (5, 150, 255)]
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 DEBUG = True
 ENGLISH = False
+IS_FOLLOWING_ROBOT = False
 
 class LaneFollowNode(DTROS):
 
@@ -22,8 +23,6 @@ class LaneFollowNode(DTROS):
     super(LaneFollowNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
     self.node_name = node_name
     self.veh = rospy.get_param("~veh")
-
-    self.is_following_robot = False
 
     # Publishers & Subscribers
     self.pub = rospy.Publisher("/" + self.veh + "/output/image/mask/compressed",
@@ -37,6 +36,12 @@ class LaneFollowNode(DTROS):
     self.vel_pub = rospy.Publisher("/" + self.veh + "/car_cmd_switch_node/cmd",
                      Twist2DStamped,
                      queue_size=1)
+    
+    # self.distance_sub = rospy.Subscriber("/" + self.veh + "/duckiebot_distance_node/distance",
+    #               Float32,
+    #               self.cb_distance,
+    #               queue_size=1,
+    #               buff_size="20MB")
 
     self.jpeg = TurboJPEG()
 
@@ -209,6 +214,7 @@ class LaneFollowNode(DTROS):
     if not msg:
       return
 
+    self.last_detected_apriltag = None
     # turn image message into grayscale image
     img = self.jpeg.decode(msg.data, pixel_format=TJPF_GRAY)
     # run input image through the rectification map
@@ -229,6 +235,8 @@ class LaneFollowNode(DTROS):
       if tag.tag_id in self.intersection_apriltags:
         self.last_detected_apriltag = tag.tag_id
     
+  def cb_distance(self, msg):
+    print("RECIEVED DISTANCE: ", msg)
 
   def drive(self):
     if self.stop:
@@ -237,7 +245,7 @@ class LaneFollowNode(DTROS):
         self.twist.omega = 0
         self.vel_pub.publish(self.twist)
 
-        if not self.is_following_robot and not self.signalled and self.last_detected_apriltag in self.inner_intersection_apriltags:
+        if not IS_FOLLOWING_ROBOT and not self.signalled and self.last_detected_apriltag in self.inner_intersection_apriltags:
           if ENGLISH:
             self.change_color("left")
           else:
@@ -268,6 +276,12 @@ class LaneFollowNode(DTROS):
         # self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
         print(self.proportional, P, D, self.twist.omega, self.twist.v)
       self.vel_pub.publish(self.twist)
+
+  # def follow(self):
+  #   if self.distance_from_robot < 2.0:
+  #     self.twist.v = 0
+  #     self.twist.omega = 0
+  #     self.vel_pub.publish(self.twist)
 
   def change_color(self, turn_signal):
     '''
