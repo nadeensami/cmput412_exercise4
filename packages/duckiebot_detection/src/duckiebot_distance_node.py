@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import cv2
+import cv2, math
 import numpy as np
 
 import rospy
@@ -30,6 +30,9 @@ class DuckiebotDistanceNode(DTROS):
     # If a reprojection error higher than that is observed. May require some actions
     self.max_reproj_pixelerror_pose_estimation = 1.5
 
+    # Rotation error, in radian
+    self.rotation_error = math.pi/4
+
     self.bridge = CvBridge()
 
     # these will be defined on the first call to calc_circle_pattern
@@ -44,18 +47,17 @@ class DuckiebotDistanceNode(DTROS):
     )
 
     # publishers
+    self.pub_rotation_of_robot_ahead = rospy.Publisher("/{}/duckiebot_distance_node/rotation".format(self.host), String, queue_size=1)
     self.pub_distance_to_robot_ahead = rospy.Publisher("/{}/duckiebot_distance_node/distance".format(self.host), Float32, queue_size=1)
     self.pcm = PinholeCameraModel()
     
     self.log("Initialization completed")
-
 
   def cb_process_camera_info(self, msg):
     """
     Callback that stores the intrinsic calibration into a PinholeCameraModel object.
 
     Args:
-
       msg (:obj:`sensor_msgs.msg.CameraInfo`): Intrinsic properties of the camera.
     """
     self.pcm.fromCameraInfo(msg)
@@ -100,9 +102,11 @@ class DuckiebotDistanceNode(DTROS):
           (R, jac) = cv2.Rodrigues(rotation_vector)
           R_inv = np.transpose(R)
           translation_vector = -np.dot(R_inv, translation_vector)
-          distance_to_vehicle = -translation_vector[2]
+          distance_to_vehicle = -translation_vector[2][0]
+          rotation_of_vehicle = rotation_vector[1][0]
           
           #####publish the distance information to a topic###
+          self.pub_rotation_of_robot_ahead.publish(self.classify_rotation(rotation_of_vehicle))
           self.pub_distance_to_robot_ahead.publish(Float32(distance_to_vehicle))
 
         else:
@@ -112,7 +116,6 @@ class DuckiebotDistanceNode(DTROS):
           )
       else:
         self.log("Pose estimation failed. " "Reporting detection at 0cm for safety.")
-
 
   def calc_circle_pattern(self, height, width):
     """
@@ -135,6 +138,17 @@ class DuckiebotDistanceNode(DTROS):
           self.circlepattern[i + j * width, 1] = (
             self.circlepattern_dist * j - self.circlepattern_dist * (height - 1) / 2
           )
+    
+  def classify_rotation(self, rotation):
+    """
+    Given a rotation, classifies the robot as either going straight, left, or right
+    """
+    if abs(rotation) < self.rotation_error:
+      return "straight"
+    elif abs(math.pi/2 - rotation) < self.rotation_error:
+      return "right"
+    else:
+      return "left"
 
 if __name__ == "__main__":
   duckiebot_distance_node = DuckiebotDistanceNode(node_name="duckiebot_distance_node")

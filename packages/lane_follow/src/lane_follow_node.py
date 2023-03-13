@@ -8,7 +8,7 @@ from dt_apriltags import Detector
 from turbojpeg import TurboJPEG, TJPF_GRAY
 from image_geometry import PinholeCameraModel
 import cv2
-from std_msgs.msg import Header, ColorRGBA, Float32
+from std_msgs.msg import Header, ColorRGBA, Float32, String
 from duckietown_msgs.msg import Twist2DStamped, LEDPattern
 
 STOP_MASK = [(0, 75, 150), (5, 150, 255)]
@@ -24,19 +24,43 @@ class LaneFollowNode(DTROS):
     self.node_name = node_name
     self.veh = rospy.get_param("~veh")
 
-    # Publishers & Subscribers
-    self.pub = rospy.Publisher("/" + self.veh + "/output/image/mask/compressed",
-                   CompressedImage,
-                   queue_size=1)
-    self.sub = rospy.Subscriber("/" + self.veh + "/camera_node/image/compressed",
-                  CompressedImage,
-                  self.callback,
-                  queue_size=1,
-                  buff_size="20MB")
-    self.vel_pub = rospy.Publisher("/" + self.veh + "/car_cmd_switch_node/cmd",
-                     Twist2DStamped,
-                     queue_size=1)
+    # Subscribers
+    self.sub = rospy.Subscriber(
+      "/" + self.veh + "/camera_node/image/compressed",
+      CompressedImage,
+      self.callback,
+      queue_size=1,
+      buff_size="20MB"
+    )
+    self.distance_sub = rospy.Subscriber(
+      "/" + self.veh + "/duckiebot_distance_node/distance",
+      Float32,
+      self.cb_distance,
+      queue_size=1,
+      buff_size="20MB"
+    )
+    self.rotation_sub = rospy.Subscriber(
+      "/" + self.veh + "/duckiebot_distance_node/rotation",
+      String,
+      self.cb_rotation,
+      queue_size=1,
+      buff_size="20MB"
+    )
     
+    # Publishers
+    self.pub = rospy.Publisher(
+      "/" + self.veh + "/output/image/mask/compressed",
+      CompressedImage,
+      queue_size=1
+    )
+    self.vel_pub = rospy.Publisher(
+      "/" + self.veh + "/car_cmd_switch_node/cmd",
+      Twist2DStamped,
+      queue_size=1
+    )
+    self.color_publisher = rospy.Publisher(f'/{self.veh}/led_emitter_node/led_pattern', LEDPattern, queue_size = 1)
+    
+<<<<<<< HEAD
     self.distance_sub = rospy.Subscriber("/" + self.veh + "/duckiebot_distance_node/distance",
                   Float32,
                   self.cb_distance,
@@ -45,6 +69,8 @@ class LaneFollowNode(DTROS):
     # distance timer
     rospy.Timer(rospy.Duration(5), self.cb_distance)
     self.last_distance_detected_time = None
+=======
+>>>>>>> 960c4f9 (Add rotation detection)
     
     self.distance_from_robot = None
 
@@ -118,7 +144,6 @@ class LaneFollowNode(DTROS):
     self.last_message = None
 
     # Initialize LED color-changing
-    self.color_publisher = rospy.Publisher(f'/{self.veh}/led_emitter_node/led_pattern', LEDPattern, queue_size = 1)
     self.pattern = LEDPattern()
     self.pattern.header = Header()
     self.signalled = False
@@ -296,7 +321,6 @@ class LaneFollowNode(DTROS):
         print(self.proportional, P, D, self.twist.omega, self.twist.v)
       self.vel_pub.publish(self.twist)
       
-
   def change_color(self, turn_signal):
     '''
     Code for this function was inspired by 
