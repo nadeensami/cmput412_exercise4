@@ -307,9 +307,9 @@ class LaneFollowNode(DTROS):
         self.signalled = False
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
-      if self.distance_from_robot is None:
+      if not self.distance_from_robot or self.distance_from_robot > self.following_distance:
         self.twist.v = self.velocity
-      elif self.distance_from_robot < self.following_distance:
+      else:
         self.twist.v = 0
 
       # Determine Omega - based on lane-following
