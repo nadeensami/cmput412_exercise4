@@ -42,6 +42,9 @@ class LaneFollowNode(DTROS):
                   self.cb_distance,
                   queue_size=1,
                   buff_size="20MB")
+    # distance timer
+    rospy.Timer(rospy.Duration(5), self.cb_distance)
+    self.last_distance_detected_time = None
     
     self.distance_from_robot = None
 
@@ -239,6 +242,7 @@ class LaneFollowNode(DTROS):
     
   def cb_distance(self, msg):
     self.distance_from_robot = msg.data
+    self.last_distance_detected_time = rospy.Time().now()
 
   def drive(self):
     if self.stop:
