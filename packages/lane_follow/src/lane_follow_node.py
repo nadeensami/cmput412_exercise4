@@ -15,7 +15,6 @@ STOP_MASK = [(0, 75, 150), (5, 150, 255)]
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 DEBUG = False
 ENGLISH = False
-IS_FOLLOWING_ROBOT = False
 
 class LaneFollowNode(DTROS):
 
@@ -84,6 +83,11 @@ class LaneFollowNode(DTROS):
     self.last_error = 0
     self.last_time = rospy.get_time()
 
+    # Left turn variables
+    self.left_turn_duration = 1.5
+    self.started_left_turn = None
+    self.turn_action = None
+
     # Stop variables
     self.stop = False
     self.last_stop_time = None
@@ -125,8 +129,14 @@ class LaneFollowNode(DTROS):
       self.camera_model.K, self.camera_model.D, None, rect_K, (W, H), cv2.CV_32FC1
     )
 
-    self.intersection_apriltags =  [169, 162, 153, 133, 62, 58]
-    self.inner_intersection_apriltags = [133, 169, 162, 58]
+    self.apriltag_actions = {
+      "169": ["right", "left"],
+      "162": ["right", "left"],
+      "153": ["left", "straight"],
+      "133": ["right", "straight"],
+      "62": ["left", "straight"],
+      "58": ["right", "straight"]
+    }
 
     self.last_detected_apriltag = None
 
@@ -256,7 +266,7 @@ class LaneFollowNode(DTROS):
         continue
 
       # save tag id if we're about to go to an intersection
-      if tag.tag_id in self.intersection_apriltags:
+      if str(tag.tag_id) in self.apriltag_actions:
         self.last_detected_apriltag = tag.tag_id
     
   def cb_distance(self, msg):
@@ -283,19 +293,16 @@ class LaneFollowNode(DTROS):
         self.twist.v = 0
         self.twist.omega = 0
         self.vel_pub.publish(self.twist)
-
-        if not IS_FOLLOWING_ROBOT and not self.signalled and self.last_detected_apriltag in self.inner_intersection_apriltags:
-          if ENGLISH:
-            self.change_color("left")
-          else:
-            self.change_color("right")
-          self.signalled = True
+        
+        if str(self.last_detected_apriltag) in self.apriltag_actions:
+          print("CHANGING COLOR: ", self.apriltag_actions[str(self.last_detected_apriltag)][0])
+          self.change_color(self.apriltag_actions[str(self.last_detected_apriltag)][0])
+          self.turn_action = self.apriltag_actions[str(self.last_detected_apriltag)][0]
 
       else:
         self.stop = False
         self.last_stop_time = rospy.get_time()
         self.change_color(None)
-        self.signalled = False
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
       if self.distance_from_robot is None:
@@ -304,27 +311,38 @@ class LaneFollowNode(DTROS):
         # Use the PID here
         pass
 
-      # Determine Omega - based on lane-following
-      if self.proportional is None:
-        self.twist.omega = 0
+      if self.turn_action == "left":
+        if self.started_left_turn == None:
+          self.started_left_turn = rospy.get_time()
+        elif rospy.get_time() - self.started_left_turn < self.left_turn_duration:
+          print("turning! ")
+          self.twist.v = self.velocity
+          self.twist.omega = -1.0
+        else:
+          self.started_left_turn = None
+          self.turn_action = None
       else:
-        # P Term
-        P = -self.proportional * self.P
+        # Determine Omega - based on lane-following
+        if self.proportional is None:
+          self.twist.omega = 0
+        else:
+          # P Term
+          P = -self.proportional * self.P
 
-        # D Term
-        d_error = (self.proportional - self.last_error) / (rospy.get_time() - self.last_time)
-        self.last_error = self.proportional
-        self.last_time = rospy.get_time()
-        D = d_error * self.D
+          # D Term
+          d_error = (self.proportional - self.last_error) / (rospy.get_time() - self.last_time)
+          self.last_error = self.proportional
+          self.last_time = rospy.get_time()
+          D = d_error * self.D
 
-        self.twist.omega = P + D
+          self.twist.omega = P + D
 
       # Publish command
       if DEBUG:
         # self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
         print(self.proportional, P, D, self.twist.omega, self.twist.v)
-      self.vel_pub.publish(self.twist)
-      
+      self.vel_pub.publish(self.twist)     
+
   def change_color(self, turn_signal):
     '''
     Code for this function was inspired by 
