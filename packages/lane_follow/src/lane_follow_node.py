@@ -259,25 +259,35 @@ class LaneFollowNode(DTROS):
         self.last_stop_time = rospy.get_time()
         self.change_color(None)
         self.signalled = False
-    elif self.proportional is None:
-      self.twist.omega = 0
-      self.vel_pub.publish(self.twist)
     else:
-      # P Term
-      P = -self.proportional * self.P
+      # Determine Velocity - based on if we're following a Duckiebot or not
+      if self.distance_from_robot is None:
+        self.twist.v = self.velocity
+      else:
+        # Use the PID here
+        pass
 
-      # D Term
-      d_error = (self.proportional - self.last_error) / (rospy.get_time() - self.last_time)
-      self.last_error = self.proportional
-      self.last_time = rospy.get_time()
-      D = d_error * self.D
+      # Determine Omega - based on lane-following
+      if self.proportional is None:
+        self.twist.omega = 0
+      else:
+        # P Term
+        P = -self.proportional * self.P
 
-      self.twist.v = self.velocity
-      self.twist.omega = P + D
+        # D Term
+        d_error = (self.proportional - self.last_error) / (rospy.get_time() - self.last_time)
+        self.last_error = self.proportional
+        self.last_time = rospy.get_time()
+        D = d_error * self.D
+
+        self.twist.omega = P + D
+
+      # Publish command
       if DEBUG:
         # self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
         print(self.proportional, P, D, self.twist.omega, self.twist.v)
       self.vel_pub.publish(self.twist)
+      
 
   def change_color(self, turn_signal):
     '''
