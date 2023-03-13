@@ -18,7 +18,6 @@ ENGLISH = False
 IS_FOLLOWING_ROBOT = False
 
 class LaneFollowNode(DTROS):
-
   def __init__(self, node_name):
     super(LaneFollowNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
     self.node_name = node_name
@@ -26,21 +25,21 @@ class LaneFollowNode(DTROS):
 
     # Subscribers
     self.sub = rospy.Subscriber(
-      "/" + self.veh + "/camera_node/image/compressed",
+      f"/{self.veh}/camera_node/image/compressed",
       CompressedImage,
       self.callback,
       queue_size=1,
       buff_size="20MB"
     )
     self.distance_sub = rospy.Subscriber(
-      "/" + self.veh + "/duckiebot_distance_node/distance",
+      f"/{self.veh}/duckiebot_distance_node/distance",
       Float32,
       self.cb_distance,
       queue_size=1,
       buff_size="20MB"
     )
     self.rotation_sub = rospy.Subscriber(
-      "/" + self.veh + "/duckiebot_distance_node/rotation",
+      f"/{self.veh}/duckiebot_distance_node/rotation",
       String,
       self.cb_rotation,
       queue_size=1,
@@ -49,16 +48,16 @@ class LaneFollowNode(DTROS):
     
     # Publishers
     self.pub = rospy.Publisher(
-      "/" + self.veh + "/output/image/mask/compressed",
+      f"/{self.veh}/output/image/mask/compressed",
       CompressedImage,
       queue_size=1
     )
     self.vel_pub = rospy.Publisher(
-      "/" + self.veh + "/car_cmd_switch_node/cmd",
+      f"/{self.veh}/car_cmd_switch_node/cmd",
       Twist2DStamped,
       queue_size=1
     )
-    self.color_publisher = rospy.Publisher(f'/{self.veh}/led_emitter_node/led_pattern', LEDPattern, queue_size = 1)
+    self.color_publisher = rospy.Publisher(f"/{self.veh}/led_emitter_node/led_pattern", LEDPattern, queue_size = 1)
     
     # Pose detection variables
     self.stale_time = 5
@@ -70,7 +69,7 @@ class LaneFollowNode(DTROS):
 
     self.jpeg = TurboJPEG()
 
-    # PID Variables
+    # Lane-following PID Variables
     self.proportional = None
     if ENGLISH:
       self.offset = -200
@@ -83,6 +82,15 @@ class LaneFollowNode(DTROS):
     self.D = -0.004
     self.last_error = 0
     self.last_time = rospy.get_time()
+
+    # Duckiebot-following PID Variables
+    # self.distance_proportional = None
+    self.following_distance = 0.2
+
+    # self.P = 0.0001
+    # self.D = -0.004
+    # self.last_distance_error = 0
+    # self.last_distance_time = rospy.get_time()
 
     # Stop variables
     self.stop = False
@@ -261,6 +269,7 @@ class LaneFollowNode(DTROS):
     
   def cb_distance(self, msg):
     self.distance_from_robot = msg.data
+    # self.distance_proportional = self.distance_from_robot - self.distance_offset
     self.last_distance_detected_time = rospy.get_time()
 
   def cb_rotation(self, msg):
@@ -300,9 +309,8 @@ class LaneFollowNode(DTROS):
       # Determine Velocity - based on if we're following a Duckiebot or not
       if self.distance_from_robot is None:
         self.twist.v = self.velocity
-      else:
-        # Use the PID here
-        pass
+      elif self.distance_from_robot < self.following_distance:
+        self.twist.v = 0
 
       # Determine Omega - based on lane-following
       if self.proportional is None:

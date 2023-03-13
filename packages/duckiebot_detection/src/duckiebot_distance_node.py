@@ -16,7 +16,7 @@ class DuckiebotDistanceNode(DTROS):
   """
   responsible for estimating the relative pose to a detected back pattern of a robot
   """
-  def __init__(self, node_name):	
+  def __init__(self, node_name):
     # Initialize the DTROS parent class
     super(DuckiebotDistanceNode, self).__init__(node_name=node_name, node_type=NodeType.PERCEPTION)
     self.host = str(os.environ['VEHICLE_NAME'])
