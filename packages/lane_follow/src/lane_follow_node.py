@@ -328,6 +328,7 @@ class LaneFollowNode(DTROS):
             print("turning! ")
             self.twist.v = self.velocity
             self.twist.omega = -1.0
+            self.vel_pub.publish(self.twist)
           else:
             self.started_action = None
             self.next_action = None
@@ -370,7 +371,7 @@ class LaneFollowNode(DTROS):
       if DEBUG:
         # self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
         print(self.proportional, P, D, self.twist.omega, self.twist.v)
-      self.vel_pub.publish(self.twist)     
+      self.vel_pub.publish(self.twist)
 
   def change_color(self, turn_signal):
     '''
