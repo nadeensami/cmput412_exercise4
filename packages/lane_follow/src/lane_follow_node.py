@@ -13,7 +13,7 @@ from duckietown_msgs.msg import Twist2DStamped, LEDPattern
 
 STOP_MASK = [(0, 75, 150), (5, 150, 255)]
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
-DEBUG = True
+DEBUG = False
 ENGLISH = False
 IS_FOLLOWING_ROBOT = False
 
@@ -37,11 +37,13 @@ class LaneFollowNode(DTROS):
                      Twist2DStamped,
                      queue_size=1)
     
-    # self.distance_sub = rospy.Subscriber("/" + self.veh + "/duckiebot_distance_node/distance",
-    #               Float32,
-    #               self.cb_distance,
-    #               queue_size=1,
-    #               buff_size="20MB")
+    self.distance_sub = rospy.Subscriber("/" + self.veh + "/duckiebot_distance_node/distance",
+                  Float32,
+                  self.cb_distance,
+                  queue_size=1,
+                  buff_size="20MB")
+    
+    self.distance_from_robot = None
 
     self.jpeg = TurboJPEG()
 
@@ -236,7 +238,7 @@ class LaneFollowNode(DTROS):
         self.last_detected_apriltag = tag.tag_id
     
   def cb_distance(self, msg):
-    print("RECIEVED DISTANCE: ", msg)
+    self.distance_from_robot = msg.data
 
   def drive(self):
     if self.stop:
@@ -276,12 +278,6 @@ class LaneFollowNode(DTROS):
         # self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
         print(self.proportional, P, D, self.twist.omega, self.twist.v)
       self.vel_pub.publish(self.twist)
-
-  # def follow(self):
-  #   if self.distance_from_robot < 2.0:
-  #     self.twist.v = 0
-  #     self.twist.omega = 0
-  #     self.vel_pub.publish(self.twist)
 
   def change_color(self, turn_signal):
     '''
