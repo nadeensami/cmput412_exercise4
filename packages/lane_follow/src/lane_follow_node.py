@@ -59,7 +59,7 @@ class LaneFollowNode(DTROS):
     # Stop variables
     self.stop = False
     self.last_stop_time = None
-    self.stop_cooldown = 5
+    self.stop_cooldown = 3
     self.stop_duration = 5
     self.stop_threshold_area = 5000 # minimun area of red to stop at
     self.stop_starttime = None
@@ -98,7 +98,7 @@ class LaneFollowNode(DTROS):
     )
 
     self.intersection_apriltags =  [169, 162, 153, 133, 62, 58]
-    self.right_turn_apriltags = [133, 169]
+    self.inner_intersection_apriltags = [133, 169, 162, 58]
 
     self.last_detected_apriltag = None
 
@@ -237,13 +237,12 @@ class LaneFollowNode(DTROS):
         self.twist.omega = 0
         self.vel_pub.publish(self.twist)
 
-        # TODO: sometimes bot doesn't stop before intersection (ie april tag # 169). FIX THIS.
-        # on autonomous lane following
-        if not self.is_following_robot and not self.signalled:
-          # right turn on 133
-          if self.last_detected_apriltag in self.right_turn_apriltags:
+        if not self.is_following_robot and not self.signalled and self.last_detected_apriltag in self.inner_intersection_apriltags:
+          if ENGLISH:
+            self.change_color("left")
+          else:
             self.change_color("right")
-            self.signalled = True
+          self.signalled = True
 
       else:
         self.stop = False
