@@ -84,8 +84,7 @@ class LaneFollowNode(DTROS):
 
     # Left turn variables
     self.left_turn_duration = 1.5
-    self.started_left_turn = None
-    self.turn_action = None
+    self.started_action = None
     
     # Duckiebot-following PID Variables
     # self.distance_proportional = None
@@ -305,17 +304,17 @@ class LaneFollowNode(DTROS):
         self.twist.omega = 0
         self.vel_pub.publish(self.twist)
         
-        if str(self.last_detected_apriltag) in self.apriltag_actions:
-          print("CHANGING COLOR: ", self.apriltag_actions[str(self.last_detected_apriltag)][0])
-          self.change_color(self.apriltag_actions[str(self.last_detected_apriltag)][0])
-          self.turn_action = self.apriltag_actions[str(self.last_detected_apriltag)][0]
-
         # Get available action from last detected april tag
-        avail_actions = self.apriltag_actions[self.last_detected_apriltag]
+        if self.last_detected_apriltag in self.apriltag_actions:
+          avail_actions = self.apriltag_actions[self.last_detected_apriltag]
+        else:
+          avail_actions = [None]
 
         # If we detect a duckiebot and that turn is valid
         if self.rotation_of_robot and self.rotation_of_robot in avail_actions:
           self.next_action = self.rotation_of_robot
+        elif "left" in avail_actions:
+          self.next_action = "left"
         else:
           self.next_action = random.choice(avail_actions)
       else:
@@ -323,18 +322,28 @@ class LaneFollowNode(DTROS):
         if self.next_action == "left":
           # Go left
           self.change_color("left")
-          # TODO: add twist command
+          if self.started_action == None:
+            self.started_action = rospy.get_time()
+          elif rospy.get_time() - self.started_action < self.left_turn_duration:
+            print("turning! ")
+            self.twist.v = self.velocity
+            self.twist.omega = -1.0
+          else:
+            self.started_action = None
+            self.next_action = None
         elif self.next_action == "right":
           # Go right
           self.change_color("right")
           # TODO: add twist command
-        else:
-          # Go straight
-          pass
+          self.next_action = None
 
-        self.stop = False
-        self.last_stop_time = rospy.get_time()
-        self.change_color(None)
+        elif self.next_action == "straight":
+          # Go straight
+          self.next_action = None
+        else:
+          self.stop = False
+          self.last_stop_time = rospy.get_time()
+          self.change_color(None)
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
       if not self.distance_from_robot or self.distance_from_robot > self.following_distance:
@@ -342,31 +351,20 @@ class LaneFollowNode(DTROS):
       else:
         self.twist.v = 0
 
-      if self.turn_action == "left":
-        if self.started_left_turn == None:
-          self.started_left_turn = rospy.get_time()
-        elif rospy.get_time() - self.started_left_turn < self.left_turn_duration:
-          print("turning! ")
-          self.twist.v = self.velocity
-          self.twist.omega = -1.0
-        else:
-          self.started_left_turn = None
-          self.turn_action = None
+      # Determine Omega - based on lane-following
+      if self.proportional is None:
+        self.twist.omega = 0
       else:
-        # Determine Omega - based on lane-following
-        if self.proportional is None:
-          self.twist.omega = 0
-        else:
-          # P Term
-          P = -self.proportional * self.P
+        # P Term
+        P = -self.proportional * self.P
 
-          # D Term
-          d_error = (self.proportional - self.last_error) / (rospy.get_time() - self.last_time)
-          self.last_error = self.proportional
-          self.last_time = rospy.get_time()
-          D = d_error * self.D
+        # D Term
+        d_error = (self.proportional - self.last_error) / (rospy.get_time() - self.last_time)
+        self.last_error = self.proportional
+        self.last_time = rospy.get_time()
+        D = d_error * self.D
 
-          self.twist.omega = P + D
+        self.twist.omega = P + D
 
       # Publish command
       if DEBUG:
