@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import rospy
+import rospy, random
 
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CameraInfo, CompressedImage
@@ -15,7 +15,6 @@ STOP_MASK = [(0, 75, 150), (5, 150, 255)]
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 DEBUG = False
 ENGLISH = False
-IS_FOLLOWING_ROBOT = False
 
 class LaneFollowNode(DTROS):
   def __init__(self, node_name):
@@ -86,6 +85,7 @@ class LaneFollowNode(DTROS):
     # Duckiebot-following PID Variables
     # self.distance_proportional = None
     self.following_distance = 0.2
+    self.next_action = None
 
     # self.P = 0.0001
     # self.D = -0.004
@@ -289,22 +289,35 @@ class LaneFollowNode(DTROS):
   def drive(self):
     if self.stop:
       if rospy.get_time() - self.stop_starttime < self.stop_duration:
+        # Stop
         self.twist.v = 0
         self.twist.omega = 0
         self.vel_pub.publish(self.twist)
 
-        if not IS_FOLLOWING_ROBOT and not self.signalled and self.last_detected_apriltag in self.inner_intersection_apriltags:
-          if ENGLISH:
-            self.change_color("left")
-          else:
-            self.change_color("right")
-          self.signalled = True
+        # Get available action from last detected april tag
+        avail_actions = self.apriltag_actions[self.last_detected_apriltag]
 
+        # If we detect a duckiebot and that turn is valid
+        if self.rotation_of_robot and self.rotation_of_robot in avail_actions:
+          self.next_action = self.rotation_of_robot
+        else:
+          self.next_action = random.choice(avail_actions)
       else:
+        # Do next action
+        if self.next_action == "left":
+          # Go left
+          self.change_color("left")
+          # TODO: add twist command
+        elif self.next_action == "right":
+          # Go right
+          self.change_color("right")
+          # TODO: add twist command
+        else:
+          # Go straight
+          pass
+
         self.stop = False
         self.last_stop_time = rospy.get_time()
-        self.change_color(None)
-        self.signalled = False
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
       if not self.distance_from_robot or self.distance_from_robot > self.following_distance:
