@@ -275,7 +275,7 @@ class LaneFollowNode(DTROS):
 
       # save tag id if we're about to go to an intersection
       if str(tag.tag_id) in self.apriltag_actions:
-        self.last_detected_apriltag = tag.tag_id
+        self.last_detected_apriltag = str(tag.tag_id)
     
   def cb_distance(self, msg):
     self.distance_from_robot = msg.data
