@@ -241,6 +241,10 @@ class LaneFollowNode(DTROS):
         self.last_detected_apriltag = tag.tag_id
     
   def cb_distance(self, msg):
+    # return if our last detected distance was less than 5 seconds ago
+    if self.last_distance_detected_time != None and rospy.Time().now() - self.last_distance_detected_time < 5:
+      return
+
     self.distance_from_robot = msg.data
     self.last_distance_detected_time = rospy.Time().now()
 
