@@ -6,13 +6,11 @@ import numpy as np
 import rospy
 import os
 from cv_bridge import CvBridge
-from duckietown.dtros import DTParam, DTROS, NodeType, ParamType
-from duckietown_msgs.msg import BoolStamped, VehicleCorners
-from duckietown_msgs.srv import ChangePattern
+from duckietown.dtros import DTROS, NodeType
+from duckietown_msgs.msg import VehicleCorners
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo
 from std_msgs.msg import String, Float32
-
 
 class DuckiebotDistanceNode(DTROS):
   """

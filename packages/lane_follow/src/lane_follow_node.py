@@ -60,23 +60,15 @@ class LaneFollowNode(DTROS):
     )
     self.color_publisher = rospy.Publisher(f'/{self.veh}/led_emitter_node/led_pattern', LEDPattern, queue_size = 1)
     
-<<<<<<< HEAD
-    self.distance_sub = rospy.Subscriber("/" + self.veh + "/duckiebot_distance_node/distance",
-                  Float32,
-                  self.cb_distance,
-                  queue_size=1,
-                  buff_size="20MB")
-    # distance timer
-    rospy.Timer(rospy.Duration(5), self.cb_distance)
+    # Pose detection variables
+    self.stale_time = 5
+    rospy.Timer(rospy.Duration(self.stale_time), self.stale_detection)
     self.last_distance_detected_time = None
-=======
->>>>>>> 960c4f9 (Add rotation detection)
-    
     self.distance_from_robot = None
+    self.last_rotation_detected_time = None
+    self.rotation_of_robot = None
 
     self.jpeg = TurboJPEG()
-
-    self.loginfo("Initialized")
 
     # PID Variables
     self.proportional = None
@@ -150,6 +142,8 @@ class LaneFollowNode(DTROS):
 
     # Shutdown hook
     rospy.on_shutdown(self.hook)
+
+    self.loginfo("Initialized")
 
   def callback(self, msg):
     self.last_message = msg
@@ -266,12 +260,22 @@ class LaneFollowNode(DTROS):
         self.last_detected_apriltag = tag.tag_id
     
   def cb_distance(self, msg):
-    # return if our last detected distance was less than 5 seconds ago
-    if self.last_distance_detected_time != None and rospy.Time().now() - self.last_distance_detected_time < 5:
-      return
-
     self.distance_from_robot = msg.data
-    self.last_distance_detected_time = rospy.Time().now()
+    self.last_distance_detected_time = rospy.get_time()
+
+  def cb_rotation(self, msg):
+    self.rotation_of_robot = msg.data
+    self.last_rotation_detected_time = rospy.get_time()
+
+  def stale_detection(self, _):
+    """
+    Remove Duckiebot detections if they are longer than the stale time
+    """
+    if self.last_distance_detected_time and rospy.get_time() - self.last_distance_detected_time < self.stale_time:
+      self.distance_from_robot = None
+    
+    if self.last_rotation_detected_time and rospy.get_time() - self.last_rotation_detected_time < self.stale_time:
+      self.rotation_of_robot = None
 
   def drive(self):
     if self.stop:
