@@ -305,7 +305,7 @@ class LaneFollowNode(DTROS):
         self.vel_pub.publish(self.twist)
         
         # Get available action from last detected april tag
-        if self.last_detected_apriltag in self.apriltag_actions:
+        if self.last_detected_apriltag and self.last_detected_apriltag in self.apriltag_actions:
           avail_actions = self.apriltag_actions[self.last_detected_apriltag]
         else:
           avail_actions = [None]
