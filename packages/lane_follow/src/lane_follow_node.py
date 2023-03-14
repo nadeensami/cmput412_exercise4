@@ -35,20 +35,20 @@ class LaneFollowNode(DTROS):
       queue_size=1,
       buff_size="20MB"
     )
-    self.distance_sub = rospy.Subscriber(
-      f"/{self.veh}/duckiebot_distance_node/distance",
-      Float32,
-      self.cb_distance,
-      queue_size=1,
-      buff_size="20MB"
-    )
-    self.rotation_sub = rospy.Subscriber(
-      f"/{self.veh}/duckiebot_distance_node/rotation",
-      String,
-      self.cb_rotation,
-      queue_size=1,
-      buff_size="20MB"
-    )
+    # self.distance_sub = rospy.Subscriber(
+    #   f"/{self.veh}/duckiebot_distance_node/distance",
+    #   Float32,
+    #   self.cb_distance,
+    #   queue_size=1,
+    #   buff_size="20MB"
+    # )
+    # self.rotation_sub = rospy.Subscriber(
+    #   f"/{self.veh}/duckiebot_distance_node/rotation",
+    #   String,
+    #   self.cb_rotation,
+    #   queue_size=1,
+    #   buff_size="20MB"
+    # )
     
     # Publishers
     self.pub = rospy.Publisher(
@@ -323,10 +323,8 @@ class LaneFollowNode(DTROS):
             self.next_action = random.choice(avail_actions)
           
           self.change_color(self.next_action)
-        
       else:
         # Do next action
-        '''
         if self.next_action == "left":
           # Go left
           if self.started_action == None:
@@ -361,16 +359,15 @@ class LaneFollowNode(DTROS):
             self.started_action = None
             self.next_action = None
         else:
-        '''
-        self.stop = False
-        self.last_stop_time = rospy.get_time()
-        self.change_color(None)
+          self.stop = False
+          self.last_stop_time = rospy.get_time()
+          self.change_color(None)
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
-      if not self.distance_from_robot or self.distance_from_robot > self.following_distance:
-        self.twist.v = self.velocity
-      else:
-        self.twist.v = 0
+      # if not self.distance_from_robot or self.distance_from_robot > self.following_distance:
+      self.twist.v = self.velocity
+      # else:
+      #   self.twist.v = 0
 
       # Determine Omega - based on lane-following
       if self.proportional is None:
