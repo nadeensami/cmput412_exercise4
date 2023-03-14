@@ -9,6 +9,8 @@ from duckietown.dtros import DTParam, DTROS, NodeType, ParamType
 from duckietown_msgs.msg import BoolStamped, VehicleCorners
 from geometry_msgs.msg import Point32
 from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import Float32
+from turbojpeg import TurboJPEG
 
 
 class DuckiebotDetectionNode(DTROS):
@@ -48,6 +50,8 @@ class DuckiebotDetectionNode(DTROS):
 
     self.bridge = CvBridge()
 
+    self.jpeg = TurboJPEG()
+
     self.last_stamp = rospy.Time.now()
 
     # Subscriber
@@ -57,6 +61,7 @@ class DuckiebotDetectionNode(DTROS):
     self.pub_centers = rospy.Publisher("/{}/duckiebot_detection_node/centers".format(self.host), VehicleCorners, queue_size=1)
     self.pub_circlepattern_image = rospy.Publisher("/{}/duckiebot_detection_node/detection_image/compressed".format(self.host), CompressedImage, queue_size=1)
     self.pub_detection = rospy.Publisher("/{}/duckiebot_detection_node/detection".format(self.host), BoolStamped, queue_size=1)
+    self.pub_detection_offset = rospy.Publisher("/{}/duckiebot_distance_node/offset".format(self.host), Float32, queue_size=1)
     self.log("Detection Initialization completed.")
 
   def cbParametersChanged(self):
@@ -78,6 +83,10 @@ class DuckiebotDetectionNode(DTROS):
       image_msg (:obj:`sensor_msgs.msg.CompressedImage`): Input image
 
     """
+    # determine width
+    img = self.jpeg.decode(image_msg.data)
+    img_width = img.shape[1]
+
     now = rospy.Time.now()
     if now - self.last_stamp < self.publish_duration:
       return
@@ -114,6 +123,9 @@ class DuckiebotDetectionNode(DTROS):
         center.y = point[0, 1]
         center.z = 0
         points_list.append(center)
+      cx = points_list[10].x # center of the circles
+      offset = cx - int(img_width / 2) # offset from center of image
+      self.pub_detection_offset.publish(offset)
       vehicle_centers_msg_out.corners = points_list
       vehicle_centers_msg_out.H = self.circlepattern_dims[1]
       vehicle_centers_msg_out.W = self.circlepattern_dims[0]
