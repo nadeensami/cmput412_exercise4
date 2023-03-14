@@ -13,7 +13,7 @@ from duckietown_msgs.msg import Twist2DStamped, LEDPattern
 
 STOP_MASK = [(0, 75, 150), (5, 150, 255)]
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
-DEBUG = False
+DEBUG = True
 ENGLISH = False
 
 class LaneFollowNode(DTROS):
@@ -56,7 +56,7 @@ class LaneFollowNode(DTROS):
       Twist2DStamped,
       queue_size=1
     )
-    self.color_publisher = rospy.Publisher(f"/{self.veh}/led_emitter_node/led_pattern", LEDPattern, queue_size = 1)
+    # self.color_publisher = rospy.Publisher(f"/{self.veh}/led_emitter_node/led_pattern", LEDPattern, queue_size = 1)
     
     # Pose detection variables
     self.stale_time = 5
@@ -71,14 +71,14 @@ class LaneFollowNode(DTROS):
     # Lane-following PID Variables
     self.proportional = None
     if ENGLISH:
-      self.offset = -200
+      self.offset = -220
     else:
-      self.offset = 200
-    self.velocity = 0.4
+      self.offset = 220
+    self.velocity = 0.2
     self.twist = Twist2DStamped(v=self.velocity, omega=0)
 
-    self.P = 0.049
-    self.D = -0.004
+    self.P = 0.045
+    self.D = -0.04
     self.last_error = 0
     self.last_time = rospy.get_time()
 
@@ -145,7 +145,7 @@ class LaneFollowNode(DTROS):
     self.last_detected_apriltag = None
 
     # Apriltag timer
-    self.publish_hz = 1
+    self.publish_hz = 2
     self.timer = rospy.Timer(rospy.Duration(1 / self.publish_hz), self.cb_apriltag_timer)
     self.last_message = None
 
@@ -223,6 +223,7 @@ class LaneFollowNode(DTROS):
       if area > max_area:
         max_idx = i
         max_area = area
+    print(max_area)
 
     if max_idx != -1:
       M = cv2.moments(stopContours[max_idx])
@@ -320,6 +321,7 @@ class LaneFollowNode(DTROS):
         
       else:
         # Do next action
+        '''
         if self.next_action == "left":
           # Go left
           if self.started_action == None:
@@ -354,9 +356,10 @@ class LaneFollowNode(DTROS):
             self.started_action = None
             self.next_action = None
         else:
-          self.stop = False
-          self.last_stop_time = rospy.get_time()
-          self.change_color(None)
+        '''
+        self.stop = False
+        self.last_stop_time = rospy.get_time()
+        self.change_color(None)
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
       print(self.distance_from_robot)
@@ -380,10 +383,10 @@ class LaneFollowNode(DTROS):
 
         self.twist.omega = P + D
 
-      # Publish command
-      if DEBUG:
-        # self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
-        print(self.proportional, P, D, self.twist.omega, self.twist.v)
+        # Publish command
+        if DEBUG:
+          # self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
+          print(self.proportional, P, D, self.twist.omega, self.twist.v)
       self.vel_pub.publish(self.twist)
 
   def change_color(self, turn_signal):
@@ -416,7 +419,7 @@ class LaneFollowNode(DTROS):
     elif  turn_signal == "left":
       self.pattern.rgb_vals = [rgba_yellow, rgba_none, rgba_none, rgba_none, rgba_yellow]
       
-    self.color_publisher.publish(self.pattern)
+    # self.color_publisher.publish(self.pattern)
 
   def hook(self):
     print("SHUTTING DOWN")

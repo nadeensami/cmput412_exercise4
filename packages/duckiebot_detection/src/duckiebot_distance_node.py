@@ -45,7 +45,7 @@ class DuckiebotDistanceNode(DTROS):
     )
 
     # publishers
-    self.pub_rotation_of_robot_ahead = rospy.Publisher("/{}/duckiebot_distance_node/rotation".format(self.host), String, queue_size=1)
+    self.pub_rotation_of_robot_ahead = rospy.Publisher("/{}/duckiebot_distance_node/rotation".format(self.host), Float32, queue_size=1)
     self.pub_distance_to_robot_ahead = rospy.Publisher("/{}/duckiebot_distance_node/distance".format(self.host), Float32, queue_size=1)
     self.pcm = PinholeCameraModel()
     
@@ -104,7 +104,8 @@ class DuckiebotDistanceNode(DTROS):
           rotation_of_vehicle = rotation_vector[1][0]
           
           #####publish the distance information to a topic###
-          self.pub_rotation_of_robot_ahead.publish(self.classify_rotation(rotation_of_vehicle))
+          self.pub_rotation_of_robot_ahead.publish(Float32(rotation_of_vehicle))
+          # self.pub_rotation_of_robot_ahead.publish(self.classify_rotation(rotation_of_vehicle))
           self.pub_distance_to_robot_ahead.publish(Float32(distance_to_vehicle))
 
         else:
