@@ -82,8 +82,8 @@ class LaneFollowNode(DTROS):
     self.velocity = 0.2
     self.twist = Twist2DStamped(v=self.velocity, omega=0)
 
-    self.P = 0.045
-    self.D = -0.04
+    self.P = 0.025
+    self.D = -0.007
     self.last_error = 0
     self.last_time = rospy.get_time()
 

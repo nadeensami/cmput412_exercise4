@@ -45,8 +45,8 @@ class DuckiebotFollowNode(DTROS):
     self.last_rotation_detected_time = None
     self.rotation_of_robot = None
 
-    self.velocity = 0.2
-    self.twist = Twist2DStamped(v = self.velocity, omega = 0)
+    self.velocity = 0.3
+    self.twist = Twist2DStamped(v = 0, omega = 0)
 
     # Distance PID variables
     self.distance_proportional = None
@@ -106,15 +106,19 @@ class DuckiebotFollowNode(DTROS):
     else:
       # Velocity control
       # P Term
-      distance_P = self.distance_proportional * self.distance_P
+      # distance_P = self.distance_proportional * self.distance_P
 
-      # D Term
-      distance_d_error = (self.distance_proportional - self.last_distance_error) / (rospy.get_time() - self.last_distance_time)
-      self.last_distance_error = self.distance_proportional
-      self.last_distance_time = rospy.get_time()
-      distance_D = distance_d_error * self.distance_D
+      # # D Term
+      # distance_d_error = (self.distance_proportional - self.last_distance_error) / (rospy.get_time() - self.last_distance_time)
+      # self.last_distance_error = self.distance_proportional
+      # self.last_distance_time = rospy.get_time()
+      # distance_D = distance_d_error * self.distance_D
 
-      self.twist.v = max(0, min(distance_P + distance_D, 0.5))
+      # self.twist.v = max(0, min(distance_P + distance_D, 0.5))
+      if self.distance_from_robot > self.following_distance:
+        self.twist.v = self.velocity
+      else:
+        self.twist.v = 0
 
       # Angle control
       # P Term
