@@ -10,17 +10,22 @@ from image_geometry import PinholeCameraModel
 import cv2
 from std_msgs.msg import Header, ColorRGBA, Float32, String
 from duckietown_msgs.msg import Twist2DStamped, LEDPattern
+from duckietown_msgs.srv import SetFSMState, SetFSMStateResponse
 
 STOP_MASK = [(0, 75, 150), (5, 150, 255)]
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 DEBUG = False
 ENGLISH = False
+SERVICE_NAME = 'lane_following_service'
 
 class LaneFollowNode(DTROS):
   def __init__(self, node_name):
     super(LaneFollowNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
     self.node_name = node_name
     self.veh = rospy.get_param("~veh")
+
+    self.service = rospy.Service(SERVICE_NAME, SetFSMState, self.toggle_lane_following)
+    self.lane_follow = False  # toggle on (True) or off (False)
 
     # Subscribers
     self.sub = rospy.Subscriber(
@@ -359,7 +364,6 @@ class LaneFollowNode(DTROS):
           self.change_color(None)
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
-      print(self.distance_from_robot)
       if not self.distance_from_robot or self.distance_from_robot > self.following_distance:
         self.twist.v = self.velocity
       else:
@@ -418,6 +422,16 @@ class LaneFollowNode(DTROS):
       
     self.color_publisher.publish(self.pattern)
 
+  def toggle_lane_following(self, request):
+    toggle = request.state
+
+    if toggle == "True":
+      self.lane_follow = True
+    else:
+      self.lane_follow = False
+
+    return SetFSMStateResponse()
+
   def hook(self):
     print("SHUTTING DOWN")
     self.twist.v = 0
@@ -430,5 +444,6 @@ if __name__ == "__main__":
   node = LaneFollowNode("lanefollow_node")
   rate = rospy.Rate(8)  # 8hz
   while not rospy.is_shutdown():
-    node.drive()
+    if node.lane_follow:
+      node.drive()
     rate.sleep()
