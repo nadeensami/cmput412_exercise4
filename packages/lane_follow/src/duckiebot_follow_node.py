@@ -5,6 +5,7 @@ import rospy
 from duckietown.dtros import DTROS, NodeType
 from std_msgs.msg import Header, Float32
 from duckietown_msgs.msg import Twist2DStamped, LEDPattern
+from duckietown_msgs.srv import SetFSMState
 
 DEBUG = True
 
@@ -47,6 +48,10 @@ class DuckiebotFollowNode(DTROS):
 
     self.velocity = 0.3
     self.twist = Twist2DStamped(v = 0, omega = 0)
+
+    rospy.wait_for_service('lane_following_service')
+    self.lane_follow = rospy.ServiceProxy('lane_following_service', SetFSMState)
+    self.lane_following = False
 
     # Distance PID variables
     self.distance_proportional = None
@@ -91,15 +96,24 @@ class DuckiebotFollowNode(DTROS):
     """
     Remove Duckiebot detections if they are longer than the stale time
     """
-    if self.last_distance_detected_time and rospy.get_time() - self.last_distance_detected_time < self.stale_time:
+    if (self.last_distance_detected_time and rospy.get_time() - self.last_distance_detected_time < self.stale_time) \
+    or (self.last_rotation_detected_time and rospy.get_time() - self.last_rotation_detected_time < self.stale_time):
       self.distance_from_robot = None
       self.distance_proportional = None
-    
-    if self.last_rotation_detected_time and rospy.get_time() - self.last_rotation_detected_time < self.stale_time:
       self.rotation_of_robot = None
       self.angle_proportional = None
 
+      if not self.lane_following:
+        self.lane_follow("True")
+        self.lane_following = True
+    elif self.lane_following:
+        self.lane_follow("False")
+        self.lane_following = False
+
   def drive(self):
+    if self.lane_following:
+      return
+    
     # Determine Omega - based on lane-following
     if not self.distance_from_robot or not self.rotation_of_robot:
       self.twist.v = 0

@@ -61,7 +61,7 @@ class LaneFollowNode(DTROS):
       Twist2DStamped,
       queue_size=1
     )
-    # self.color_publisher = rospy.Publisher(f"/{self.veh}/led_emitter_node/led_pattern", LEDPattern, queue_size = 1)
+    self.color_publisher = rospy.Publisher(f"/{self.veh}/led_emitter_node/led_pattern", LEDPattern, queue_size = 1)
     
     # Pose detection variables
     self.stale_time = 5
@@ -431,7 +431,7 @@ class LaneFollowNode(DTROS):
     elif  turn_signal == "left":
       self.pattern.rgb_vals = [rgba_yellow, rgba_none, rgba_none, rgba_none, rgba_yellow]
       
-    # self.color_publisher.publish(self.pattern)
+    self.color_publisher.publish(self.pattern)
 
   def toggle_lane_following(self, request):
     toggle = request.state
