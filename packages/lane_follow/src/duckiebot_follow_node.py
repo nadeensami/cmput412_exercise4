@@ -45,7 +45,7 @@ class DuckiebotFollowNode(DTROS):
 
     # Pose detection variables
     self.stale_time = 1
-    rospy.Timer(rospy.Duration(self.stale_time), self.stale_detection)
+    rospy.Timer(rospy.Duration(1/5), self.stale_detection)
     self.last_distance_detected_time = None
     self.distance_from_robot = None
     self.last_rotation_detected_time = None
@@ -71,7 +71,7 @@ class DuckiebotFollowNode(DTROS):
     self.last_angle_time = rospy.get_time()
     
     # Duckiebot-following variables
-    self.following_distance = 0.2
+    self.following_distance = 0.3
 
     # Initialize LED color-changing
     self.pattern = LEDPattern()
