@@ -307,6 +307,9 @@ class LaneFollowNode(DTROS):
       self.rotation_of_robot = None
 
   def drive(self):
+    if not self.lane_follow:
+      return
+
     if self.stop:
       if rospy.get_time() - self.stop_starttime < self.stop_duration:
         # Stop
@@ -452,6 +455,5 @@ if __name__ == "__main__":
   node = LaneFollowNode("lanefollow_node")
   rate = rospy.Rate(8)  # 8hz
   while not rospy.is_shutdown():
-    if node.lane_follow:
-      node.drive()
+    node.drive()
     rate.sleep()
