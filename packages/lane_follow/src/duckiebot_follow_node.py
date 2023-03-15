@@ -132,7 +132,7 @@ class DuckiebotFollowNode(DTROS):
       # self.last_distance_time = rospy.get_time()
       # distance_D = distance_d_error * self.distance_D
 
-      # self.twist.v = max(0, min(distance_P + distance_D, 0.5))
+      # self.twist.v = max(0, min(distance_P + distance_D, 0.4))
       if self.distance_from_robot > self.following_distance:
         self.twist.v = self.velocity
       else:
