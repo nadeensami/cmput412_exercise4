@@ -38,6 +38,11 @@ class DuckiebotFollowNode(DTROS):
       queue_size=1
     )
 
+    # Lane following service
+    rospy.wait_for_service('lane_following_service')
+    self.lane_follow = rospy.ServiceProxy('lane_following_service', SetFSMState)
+    self.lane_following = False
+
     # Pose detection variables
     self.stale_time = 1
     rospy.Timer(rospy.Duration(self.stale_time), self.stale_detection)
@@ -48,10 +53,6 @@ class DuckiebotFollowNode(DTROS):
 
     self.velocity = 0.3
     self.twist = Twist2DStamped(v = 0, omega = 0)
-
-    rospy.wait_for_service('lane_following_service')
-    self.lane_follow = rospy.ServiceProxy('lane_following_service', SetFSMState)
-    self.lane_following = False
 
     # Distance PID variables
     self.distance_proportional = None
@@ -96,8 +97,9 @@ class DuckiebotFollowNode(DTROS):
     """
     Remove Duckiebot detections if they are longer than the stale time
     """
-    if (self.last_distance_detected_time and rospy.get_time() - self.last_distance_detected_time < self.stale_time) \
-    or (self.last_rotation_detected_time and rospy.get_time() - self.last_rotation_detected_time < self.stale_time):
+    if not self.last_distance_detected_time or not self.last_distance_detected_time \
+    or (self.last_distance_detected_time and rospy.get_time() - self.last_distance_detected_time > self.stale_time) \
+    or (self.last_rotation_detected_time and rospy.get_time() - self.last_rotation_detected_time > self.stale_time):
       self.distance_from_robot = None
       self.distance_proportional = None
       self.rotation_of_robot = None
@@ -106,9 +108,11 @@ class DuckiebotFollowNode(DTROS):
       if not self.lane_following:
         self.lane_follow("True")
         self.lane_following = True
-    elif self.lane_following:
-        self.lane_follow("False")
-        self.lane_following = False
+    elif (self.last_distance_detected_time and rospy.get_time() - self.last_distance_detected_time < self.stale_time) \
+    and (self.last_rotation_detected_time and rospy.get_time() - self.last_rotation_detected_time < self.stale_time) \
+    and self.lane_following:
+      self.lane_follow("False")
+      self.lane_following = False
 
   def drive(self):
     if self.lane_following:
@@ -145,8 +149,6 @@ class DuckiebotFollowNode(DTROS):
       angle_D = angle_d_error * self.angle_D
 
       self.twist.omega = angle_P + angle_D
-
-      print('angle:', self.angle_proportional)
 
       # Publish command
       if DEBUG:

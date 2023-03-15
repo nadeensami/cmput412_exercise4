@@ -35,20 +35,6 @@ class LaneFollowNode(DTROS):
       queue_size=1,
       buff_size="20MB"
     )
-    # self.distance_sub = rospy.Subscriber(
-    #   f"/{self.veh}/duckiebot_distance_node/distance",
-    #   Float32,
-    #   self.cb_distance,
-    #   queue_size=1,
-    #   buff_size="20MB"
-    # )
-    # self.rotation_sub = rospy.Subscriber(
-    #   f"/{self.veh}/duckiebot_distance_node/rotation",
-    #   String,
-    #   self.cb_rotation,
-    #   queue_size=1,
-    #   buff_size="20MB"
-    # )
     
     # Publishers
     self.pub = rospy.Publisher(
@@ -79,10 +65,10 @@ class LaneFollowNode(DTROS):
       self.offset = -220
     else:
       self.offset = 220
-    self.velocity = 0.2
+    self.velocity = 0.3
     self.twist = Twist2DStamped(v=self.velocity, omega=0)
 
-    self.P = 0.025
+    self.P = 0.020
     self.D = -0.007
 
     # override values if Celina's robot
@@ -236,7 +222,6 @@ class LaneFollowNode(DTROS):
       if area > max_area:
         max_idx = i
         max_area = area
-    print(max_area)
 
     if max_idx != -1:
       M = cv2.moments(stopContours[max_idx])
@@ -261,7 +246,6 @@ class LaneFollowNode(DTROS):
     '''
     Callback for timer
     '''
-
     msg = self.last_message
     if not msg:
       return
