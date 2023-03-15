@@ -31,6 +31,8 @@ dts devel build -f -H $BOT
 dts devel run -H $BOT
 ```
 
+To shutdown the program, enter `CTRL + C` in your terminal.
+
 ## Credit:
 
 This code is built from the 412 exercise 4 template that provides a boilerplate repository for developing ROS-based software in Duckietown (https://github.com/XZPshaw/CMPUT412503_exercise4).
