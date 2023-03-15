@@ -1,47 +1,40 @@
-# Template: template-ros
+# Exercise 4: Don’t Crash! Tailing Behaviour
 
-This template provides a boilerplate repository
-for developing ROS-based software in Duckietown.
+This repository contains implementation solutions for exercise 4. For information about the project, please read the report at:
 
-**NOTE:** If you want to develop software that does not use
-ROS, check out [this template](https://github.com/duckietown/template-basic).
+[Nadeen Mohamed's site](https://sites.google.com/ualberta.ca/nadeen-cmput-412/written-reports/exercise-4) or [Celina Sheng's site](https://sites.google.com/ualberta.ca/csheng2-cmput-412/exercise-4)
 
 
-## How to use it
+## Structure
 
-### 1. Fork this repository
+There are two packages in this file: duckiebot_detection and lane_follow. We will discuss the purpose of the python source files for each package (which are located inside the packages `src` folder).
 
-Use the fork button in the top-right corner of the github page to fork this template repository.
+### Duckiebot Detection
 
+- `duckiebot_detection_node.py`: Implements a node that uses computer vision to detect a robot's circle pattern (located at the back of a Duckiebot). It publishes the circle pattern information to a rostopic.
 
-### 2. Create a new repository
+- `duckiebot_distance_node.py`: Implements a node that uses the DuckiebotDetectionNode's detection information. It uses the detection information to calculate the distance between the source robot and the leader/detected robot. It also calculates the rotation of the leader robot. It publishes the distance and rotation to two separate rostopics.
 
-Create a new repository on github.com while
-specifying the newly forked template repository as
-a template for your new repository.
+### Lane Follow
 
+- `duckiebot_follow_node.py`: Implements a node that tails behind a robot. It uses the distance and rotation information from the DuckiebotDetectionNode. It communicates to a rosservice in the LaneFollowNode if it no longer detects a leader robot to tail behind. In such case, it toggles autonomous lane following on.
 
-### 3. Define dependencies
-
-List the dependencies in the files `dependencies-apt.txt` and
-`dependencies-py3.txt` (apt packages and pip packages respectively).
+- `lane_follow_node.py`: Implements a node to autonomously drive in a Duckietown lane. It contains a rosservice, which tells the node whether we want to lane follow or not.
 
 
-### 4. Place your code
+## Execution:
 
-Place your code in the directory `/packages/` of
-your new repository.
+To run the program, ensure that the variable `$BOT` stores your robot's host name, and run the following commands:
 
+```
+dts devel build -f -H $BOT
+dts devel run -H $BOT
+```
 
-### 5. Setup launchers
+## Credit:
 
-The directory `/launchers` can contain as many launchers (launching scripts)
-as you want. A default launcher called `default.sh` must always be present.
+This code is built from the 412 exercise 4 template that provides a boilerplate repository for developing ROS-based software in Duckietown (https://github.com/XZPshaw/CMPUT412503_exercise4).
 
-If you create an executable script (i.e., a file with a valid shebang statement)
-a launcher will be created for it. For example, the script file 
-`/launchers/my-launcher.sh` will be available inside the Docker image as the binary
-`dt-launcher-my-launcher`.
+Build on top of by Nadeen Mohamed and Celina Sheng.
 
-When launching a new container, you can simply provide `dt-launcher-my-launcher` as
-command.
+Autonomous lane following code was also borrowed from Justin Francis.
