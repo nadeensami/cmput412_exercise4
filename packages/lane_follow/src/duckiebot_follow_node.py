@@ -3,7 +3,7 @@
 import rospy
 
 from duckietown.dtros import DTROS, NodeType
-from std_msgs.msg import Header, Float32
+from std_msgs.msg import Header, ColorRGBA, Float32, String
 from duckietown_msgs.msg import Twist2DStamped, LEDPattern
 from duckietown_msgs.srv import SetFSMState
 
@@ -37,6 +37,8 @@ class DuckiebotFollowNode(DTROS):
       Twist2DStamped,
       queue_size=1
     )
+    self.color_publisher = rospy.Publisher(f"/{self.veh}/led_emitter_node/led_pattern", LEDPattern, queue_size = 1)
+    self.turn_on_light()
 
     # Lane following service
     rospy.wait_for_service('lane_following_service')
@@ -154,6 +156,25 @@ class DuckiebotFollowNode(DTROS):
       if DEBUG:
         print('[DEBUG]', self.distance_proportional, self.twist.omega, self.twist.v)
     self.vel_pub.publish(self.twist)
+
+  def turn_on_light(self):
+    '''
+    Code for this function was inspired by 
+    "duckietown/dt-core", file "led_emitter_node.py"
+    Link: https://github.com/duckietown/dt-core/blob/daffy/packages/led_emitter/src/led_emitter_node.py
+    Author: GitHub user liampaull
+    '''
+    self.pattern.header.stamp = rospy.Time.now()
+    rgba_white = ColorRGBA()
+
+    rgba_white.r = 1.0
+    rgba_white.g = 1.0
+    rgba_white.b = 1.0
+    rgba_white.a = 1.0
+
+    self.pattern.rgb_vals = [rgba_white] * 5
+    
+    self.color_publisher.publish(self.pattern)
 
   def hook(self):
     print("SHUTTING DOWN")
