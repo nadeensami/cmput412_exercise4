@@ -42,6 +42,13 @@ class LaneFollowNode(DTROS):
       queue_size=1,
       buff_size="20MB"
     )
+    self.distance_sub = rospy.Subscriber(
+      f"/{self.veh}/front_center_tof_driver_node/range",
+      Float32,
+      self.cb_tof,
+      queue_size=1,
+      buff_size="20MB"
+    )
     
     # Publishers
     self.pub = rospy.Publisher(
@@ -84,6 +91,10 @@ class LaneFollowNode(DTROS):
       self.D = -0.004
       self.offset = 200
       self.velocity = 0.25
+    elif self.veh == "csc22916":
+      self.P = 0.049
+      self.D = -0.004
+      self.velocity = 0.25
 
     self.last_error = 0
     self.last_time = rospy.get_time()
@@ -97,6 +108,10 @@ class LaneFollowNode(DTROS):
     # Duckiebot-following variables
     self.following_distance = 0.2
     self.next_action = None
+
+    # TOF variables
+    self.range = None
+    self.last_range_detected_time = None
 
     # Stop variables
     self.stop = False
@@ -286,6 +301,10 @@ class LaneFollowNode(DTROS):
   def cb_rotation(self, msg):
     self.rotation_of_robot = msg.data
     self.last_rotation_detected_time = rospy.get_time()
+  
+  def cb_tof(self, msg):
+    self.range = msg.range
+    self.last_range_detected_time = rospy.get_time()
 
   def stale_detection(self, _):
     """
@@ -296,6 +315,9 @@ class LaneFollowNode(DTROS):
     
     if self.last_rotation_detected_time and rospy.get_time() - self.last_rotation_detected_time < self.stale_time:
       self.rotation_of_robot = None
+    
+    if self.last_range_detected_time and rospy.get_time() - self.last_range_detected_time < self.stale_time:
+      self.range = None
 
   def drive(self):
     if not self.lane_follow:
@@ -366,7 +388,8 @@ class LaneFollowNode(DTROS):
           self.change_color(None)
     else:
       # Determine Velocity - based on if we're following a Duckiebot or not
-      if self.distance_from_robot:
+      if (self.distance_from_robot and self.distance_from_robot < self.following_distance) \
+      or (self.range and self.range < self.following_distance):
         self.twist.v = 0
       else:
         self.twist.v = self.velocity

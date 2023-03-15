@@ -30,6 +30,13 @@ class DuckiebotFollowNode(DTROS):
       queue_size=1,
       buff_size="20MB"
     )
+    self.distance_sub = rospy.Subscriber(
+      f"/{self.veh}/front_center_tof_driver_node/range",
+      Float32,
+      self.cb_tof,
+      queue_size=1,
+      buff_size="20MB"
+    )
     
     # Publishers
     self.vel_pub = rospy.Publisher(
@@ -38,7 +45,13 @@ class DuckiebotFollowNode(DTROS):
       queue_size=1
     )
     self.color_publisher = rospy.Publisher(f"/{self.veh}/led_emitter_node/led_pattern", LEDPattern, queue_size = 1)
+    self.pattern = LEDPattern()
+    self.pattern.header = Header()
     self.turn_on_light()
+
+    # TOF variables
+    self.range = None
+    self.last_range_detected_time = None
 
     # Lane following service
     rospy.wait_for_service('lane_following_service')
@@ -94,6 +107,10 @@ class DuckiebotFollowNode(DTROS):
     self.rotation_of_robot = msg.data
     self.angle_proportional = self.rotation_of_robot
     self.last_rotation_detected_time = rospy.get_time()
+  
+  def cb_tof(self, msg):
+    self.range = msg.range
+    self.last_range_detected_time = rospy.get_time()
 
   def stale_detection(self, _):
     """
@@ -116,6 +133,9 @@ class DuckiebotFollowNode(DTROS):
       self.lane_follow("False")
       self.lane_following = False
 
+    if self.last_range_detected_time and rospy.get_time() - self.last_range_detected_time < self.stale_time:
+      self.range = None
+
   def drive(self):
     if self.lane_following:
       return
@@ -135,10 +155,11 @@ class DuckiebotFollowNode(DTROS):
       # distance_D = distance_d_error * self.distance_D
 
       # self.twist.v = max(0, min(distance_P + distance_D, 0.4))
-      if self.distance_from_robot > self.following_distance:
-        self.twist.v = self.velocity
-      else:
+      if (self.distance_from_robot < self.following_distance) \
+      or (self.range and self.range < self.following_distance):
         self.twist.v = 0
+      else:
+        self.twist.v = self.velocity
 
       # Angle control
       # P Term
