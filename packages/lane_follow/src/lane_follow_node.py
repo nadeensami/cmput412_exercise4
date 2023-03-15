@@ -84,6 +84,14 @@ class LaneFollowNode(DTROS):
 
     self.P = 0.025
     self.D = -0.007
+
+    # override values if Celina's robot
+    if self.veh == "csc22905":
+      self.P = 0.049
+      self.D = -0.004
+      self.offset = 200
+      self.velocity = 0.25
+
     self.last_error = 0
     self.last_time = rospy.get_time()
 
